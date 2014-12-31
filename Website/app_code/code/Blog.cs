@@ -49,6 +49,14 @@ public static class Blog
         }
     }
 
+    public static bool IsEditing
+    {
+        get
+        {
+            return HttpContext.Current.Request.QueryString["mode"] == "edit";
+        }
+    }
+
     public static Post CurrentPost
     {
         get
@@ -57,7 +65,7 @@ public static class Blog
             {
                 var post = Storage.GetAllPosts().FirstOrDefault(p => p.Slug == CurrentSlug);
 
-                if (post != null && (post.IsPublished || HttpContext.Current.User.Identity.IsAuthenticated))
+                if (post != null && (post.IsPublished || HttpContext.Current.User.Identity.IsAuthenticated || (HttpContext.Current.Request.QueryString["key"] ?? string.Empty).Equals(post.ID, StringComparison.InvariantCultureIgnoreCase)))
                     HttpContext.Current.Items["currentpost"] = Storage.GetAllPosts().FirstOrDefault(p => p.Slug == CurrentSlug);
             }
 
@@ -137,7 +145,15 @@ public static class Blog
 
     public static string SaveFileToDisk(byte[] bytes, string extension)
     {
-        string relative = "~/posts/files/" + Guid.NewGuid() + "." + extension.Trim('.');
+        string relative = "~/posts/files/" + Guid.NewGuid();
+
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = ".bin";
+        else
+            extension = "." + extension.Trim('.');
+
+        relative += extension;
+
         string file = HostingEnvironment.MapPath(relative);
 
         File.WriteAllBytes(file, bytes);
@@ -164,7 +180,7 @@ public static class Blog
 
     public static string FingerPrint(string rootRelativePath, string cdnPath = "")
     {
-        if (HttpContext.Current.Request.IsLocal)
+        if ( HttpContext.Current.Request.IsLocal && String.IsNullOrWhiteSpace( Blog.BlogPath ) )
             return rootRelativePath;
 
         if (!string.IsNullOrEmpty(cdnPath) && !HttpContext.Current.IsDebuggingEnabled)
